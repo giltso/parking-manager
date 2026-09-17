@@ -6,12 +6,11 @@ This document comes **before any code**. It covers the data model, the routes,
 and the exception table. It also explains *why* each design choice was made.
 Look for the **Why:** notes; they're written for someone new to building web apps.
 
-> **Status (2026-09-15):** nothing is confirmed. [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md)
-> orders every item by weight (Foundations → Structure → Details) and tags it
-> **Core idea**, **Default** or **Open**. The core ideas are C1–C5 and the
-> questions are Q1–Q11. This plan implements the core ideas and the current
-> defaults, all of which may change when the client answers. Where the two
-> documents disagree, DESIGN_DECISIONS.md wins. §16 maps items to sections.
+> **Status (2026-09-17):** nothing is confirmed. The plain-language summary for
+> the client is [PARKING_MANAGER_SUGGESTION.md](PARKING_MANAGER_SUGGESTION.md). "Suggestion N" below means its section N,
+> where the reasoning and open questions for that topic live. This plan
+> implements the current defaults, which may change when the client answers.
+> §16 maps the summary's sections to this plan.
 
 ---
 
@@ -68,7 +67,7 @@ the v2 policy can be based on real data.
 | Server | `uvicorn`, **exactly one worker process** | The background scheduler (§7.4) runs inside the app process. Two workers would mean two schedulers. |
 | Container | One Dockerfile, one volume at `/data` holding `parking.db` | "One container, one file database." |
 | Languages | English + Hebrew; JSON message catalogs (`app/i18n/en.json`, `he.json`), a `t()` helper in Jinja, `<html lang dir>` per request, CSS logical properties (`margin-inline-start`) | One stylesheet works left-to-right and right-to-left. JSON catalogs need no compile step. A test checks both files have the same keys. Phones, plates and times are wrapped in `<bdi dir="ltr">` so they don't scramble inside Hebrew text. |
-| Hosting | **Testing:** home computer, `localhost` plus a temporary tunnel address (testers reinstall once later). **v1 launch requires the building's own domain** (name: Q2), via Cloudflare Tunnel at home, later a VPS with Caddy on the same domain. | Push subscriptions and PWA installs are tied to the **origin** (the web address). Keeping the same domain across the move means nobody reinstalls. The app only needs `BASE_URL` and to trust the proxy's forwarded headers. |
+| Hosting | **Testing:** home computer, `localhost` plus a temporary tunnel address (testers reinstall once later). **v1 launch requires the building's own domain** (name: Suggestion 2), via Cloudflare Tunnel at home, later a VPS with Caddy on the same domain. | Push subscriptions and PWA installs are tied to the **origin** (the web address). Keeping the same domain across the move means nobody reinstalls. The app only needs `BASE_URL` and to trust the proxy's forwarded headers. |
 
 **Why plain `sqlite3` instead of an ORM like SQLAlchemy:** with an ORM you'd be
 learning SQL *and* the ORM's rules at the same time. This schema has ten small
@@ -127,9 +126,9 @@ booking rule is enforced in exactly one spot. `web` only translates HTTP to
 service calls and back. This is also what makes the v2 credits/payments hook
 possible without touching views (§13).
 
-### 2.1a If Q2 changes: moving to an online database
+### 2.1a If the architecture changes: moving to an online database
 
-Q2 in DESIGN_DECISIONS.md asks whether the app may ever need several buildings,
+Suggestion 2 notes the app may one day need several buildings,
 several servers, or outside systems reading the data. If so, these parts change,
 and nothing else should:
 
@@ -156,8 +155,8 @@ routes only talk to services (§2.1, §13).
 | `START_PUSH_SKIP_MINUTES` | 5 | Skip the "taking it?" push if the booking was made this close to its start |
 | `EXTEND_STEP_MINUTES` | 60 | How much one tap of [extend] adds |
 | `FIT_LOOKAROUND_HOURS` | 24 | How far before/after a window we look when measuring free time |
-| `BOOKING_HORIZON_DAYS` | 14 | How far ahead a booking may end (C3) |
-| `PLAN_OPEN_HORIZON_DAYS` | 7 | Time opened by a recurring **plan** is shown and bookable only this far ahead. Manual one-off openings may be created any distance ahead and are bookable within `BOOKING_HORIZON_DAYS` (C3). |
+| `BOOKING_HORIZON_DAYS` | 14 | How far ahead a booking may end (Suggestion 4) |
+| `PLAN_OPEN_HORIZON_DAYS` | 7 | Time opened by a recurring **plan** is shown and bookable only this far ahead. Manual one-off openings may be created any distance ahead and are bookable within `BOOKING_HORIZON_DAYS` (Suggestion 4). |
 | `TICK_SECONDS` | 30 | Background sweep interval |
 | `SESSION_DAYS` | 180 | Session lifetime, extended on each visit |
 | `DATABASE_PATH` | `/data/parking.db` | |
@@ -209,9 +208,9 @@ so a bug in Python can't store an impossible row.
 | name | text, required | Shown to neighbours |
 | phone | text, required | Normalised to E.164 (`+9725…`). Shown only in specific situations (§8.6). |
 | unit | text, required | **Display only.** Nothing in the app keys off it. |
-| is_coordinator | bool | In-app operations role (default, Q9): seeds spaces, approves sign-ups, issues sign-in links, settles disputed claims, deactivates users, sees reports. Proposed at launch: the client, the building manager and the tenant leader. The **maintainer** is not a flag: they have no in-app powers (§11.1). |
-| status | `pending` / `approved` / `rejected` / `deactivated` | Sign-up creates `pending`. Only `approved` people may book, claim or be granted rights (default, Q7). Deactivation replaces deletion, so the history stays intact. |
-| locale | `en` / `he` | Chosen by the person; suggested from the browser at sign-up (default, Q5) |
+| is_coordinator | bool | In-app operations role (default, Suggestion 10): seeds spaces, approves sign-ups, issues sign-in links, settles disputed claims, deactivates users, sees reports. Proposed at launch: the client, the building manager and the tenant leader. The **maintainer** is not a flag: they have no in-app powers (§11.1). |
+| status | `pending` / `approved` / `rejected` / `deactivated` | Sign-up creates `pending`. Only `approved` people may book, claim or be granted rights (default, Suggestion 10). Deactivation replaces deletion, so the history stays intact. |
+| locale | `en` / `he` | Chosen by the person; suggested from the browser at sign-up (default, Suggestion 2) |
 
 ### 4.2 `plate`
 
@@ -236,7 +235,7 @@ so a bug in Python can't store an impossible row.
 | role | `owner` / `manager` | CHECK |
 | valid_from_utc | text | |
 | valid_to_utc | text, nullable | null = until released/revoked |
-| status | `active` / `disputed` / `rejected` | A claim on an already-owned space is `disputed` until a coordinator decides (default, Q8) |
+| status | `active` / `disputed` / `rejected` | A claim on an already-owned space is `disputed` until a coordinator decides (default, Suggestion 7) |
 | granted_by | FK person, nullable | null for a self-claim |
 | ended_reason | nullable: `released` / `revoked` / `coordinator_revoked` / `coordinator_replaced` / `expired` | |
 
@@ -250,10 +249,10 @@ makes false claims visible.
 | owner | yes | yes | grant owner (co-owner) or manager; revoke managers | yes |
 | manager | yes | yes | no | yes (default) |
 
-**Vocabulary (C2):** a *user* is any registered person, as opposed to a *guest*.
+**Vocabulary (Suggestion 3):** a *user* is any registered person, as opposed to a *guest*.
 A user acting on the offering side is a *solicitor* (holds an owner or manager
 right). A user acting on the booking side is a *client*. One person is often both.
-The brief's space-level `user` right is **removed** (default; part of Q8),
+The brief's space-level `user` right is **removed** (default; part of Suggestion 7),
 and **no right lets anyone book closed time**.
 
 **Owner rights have no end date.** They end only when the owner releases them or
@@ -300,8 +299,8 @@ the data v2 needs.
 | kind | `self` / `guest` | |
 | guest_label | text | Required when kind=guest (CHECK), e.g. "Mum", "Plumber" |
 | guest_token | text, unique, nullable | Only for guest bookings: 32 random bytes, URL-safe |
-| guest_phone | text, nullable | Entered by the host at booking, or **required** from the guest before "I'm parked" (C2) |
-| plate | text, nullable | **Optional** for both kinds, copied at booking time (C2) |
+| guest_phone | text, nullable | Entered by the host at booking, or **required** from the guest before "I'm parked" (Suggestion 8) |
+| plate | text, nullable | **Optional** for both kinds, copied at booking time (Suggestion 3) |
 | start_utc, end_utc | text | CHECK `end_utc > start_utc` |
 | state | `held` / `parked` / `ended` / `cancelled` / `expired` | |
 | claimed_by | `parker` / `host` / null | Set once, on the claim |
@@ -309,7 +308,7 @@ the data v2 needs.
 | closed_at_utc | nullable | When it stopped being held/parked |
 | close_reason | nullable: `ended` / `released` / `cancelled` / `reclaimed` / `withdrawn` / `expired` / `occupied` | More detail than `state`, for analytics |
 | change_count | int | Every edit or extension |
-| start_postponed_count | int | Times the start was moved later (C4). Shown to the space's owners and to coordinators. |
+| start_postponed_count | int | Times the start was moved later (Suggestion 6). Shown to the space's owners and to coordinators. |
 
 Index on `(space_id, state, start_utc, end_utc)`. Every availability query uses it.
 
@@ -347,7 +346,7 @@ There is exactly **one** implementation:
 def resolve_availability(space_id: int, start_utc: datetime, end_utc: datetime, now: datetime) -> Timeline
 ```
 
-`now` is passed in (from `clock.now_utc()`) because of the plan horizon (C3):
+`now` is passed in (from `clock.now_utc()`) because of the plan horizon (Suggestion 4):
 occurrences of **open plans** are clipped at `now + PLAN_OPEN_HORIZON_DAYS`.
 Beyond that, only one-off openings make time open. Closed plans are never clipped,
 because closing is always safe.
@@ -465,7 +464,7 @@ Space B  free 14:00–17:30   gaps 0 / 30     ✘ 30-min orphan → not offered
 ### 6.2 When nothing survives
 
 If every bookable space fails only the margin rule, show **adjusted windows**
-(default, Q10): stretch the request to the edge of the small gap so the gap becomes zero.
+(default, Suggestion 5): stretch the request to the edge of the small gap so the gap becomes zero.
 Space B above would be offered as "Space B fits if you book **14:00–17:30**".
 The adjusted window always *contains* the original, so the requester still gets
 everything they asked for. They pay the cost by holding it longer (→ asymmetry).
@@ -503,7 +502,7 @@ stateDiagram-v2
 |---|---|---|---|---|
 | — → held | Book | approved resident | Bookable + margin, start ≥ now, end ≤ horizon | |
 | held (edit) | Change start and/or end | host (guest via link: "start now" only) | New window bookable ignoring this booking, start ≥ now, end ≤ horizon. Expiry recomputed from the new start. | |
-| held → parked | "I'm parked" | parker (self: host; guest: guest via link, after giving a phone if none is on file) | **now ≥ start** (C4), now < expiry | |
+| held → parked | "I'm parked" | parker (self: host; guest: guest via link, after giving a phone if none is on file) | **now ≥ start** (Suggestion 6), now < expiry | |
 | held → parked | "Mark as parked for guest" | host, guest bookings only | **now ≥ start_utc** | |
 | held → expired | sweep | system | now ≥ min(start + GRACE, end) | expired |
 | held → cancelled | Cancel | host (or guest via link) | | cancelled |
@@ -528,15 +527,15 @@ tap should never cause an error or a second event.
 
 ### 7.3 Edit and extend
 
-**Edit (held bookings only, C4).** Arriving early is handled by moving the
+**Edit (held bookings only, Suggestion 6).** Arriving early is handled by moving the
 start earlier ("start now"), not by claiming early. It's allowed if the space is
 open and free for the added time. Parking first and tapping "I'm parked" later
 (before expiry) is fine. Moving the start later is allowed by default
-(C4); it pushes the expiry back. Every edit is recorded with old and new
+(Suggestion 6); it pushes the expiry back. Every edit is recorded with old and new
 times, and the booking page shows its change history to the space's owners and
 managers and to coordinators. `/coordinator/reports/holds` lists bookings with
 `start_postponed_count >= 2` and held bookings that expired unused, so
-abuse is visible without automatic limits (C4). After the claim, only
+abuse is visible without automatic limits (Suggestion 6). After the claim, only
 the end can change (extend). The margin rule isn't applied to edits, the same as
 for extensions.
 
@@ -585,9 +584,9 @@ That opens one question with two big buttons:
 That's one screen and one tap (→ asymmetry). A claim on a space that **already has
 an active owner** isn't rejected. It's stored as `disputed`, P6 goes to the
 coordinators, and the current owner keeps full control and is not notified. The
-coordinator approves it as co-owner, replaces the owner, or rejects it (default, Q8). The
+coordinator approves it as co-owner, replaces the owner, or rejects it (default, Suggestion 7). The
 claim screen has one line noting that guests may see the owner's phone in a
-dispute (C2). The board lists every space with
+dispute (Suggestion 7). The board lists every space with
 its owner's name, unit and "since" date, plus claim history, so every resident
 can spot a false claim.
 
@@ -595,7 +594,7 @@ can spot a false claim.
 
 - Big current status: **Open**, **Closed** or **Booked by Dana (unit 7), plate 12-345-67, until 18:00**.
 - A 7-day strip showing open, closed and booked time.
-- **One-tap preset buttons** (default, Q3). Only the relevant set shows:
+- **One-tap preset buttons** (default, Suggestion 7). Only the relevant set shows:
   - If open now: **Block** → `next 3 h` · `rest of today` · `until tomorrow 08:00` · `until I unblock`
   - If closed now: **Open** → `rest of today` · `until tomorrow 08:00` · `until I close it`
 - Tapping an active block or open period on the strip shows **Remove**, also one tap.
@@ -606,7 +605,7 @@ can spot a false claim.
 
 ### 8.3 What a preset tap does
 
-> **Reclaim policy is open (Q4, needs the client's answers):** whether a *parked*
+> **Reclaim policy is open (Suggestion 7, needs the client's answers):** whether a *parked*
 > car gets notice time, whether future bookings can be cancelled right up to
 > their start, and whether repeated reclaims are visible. Below is the brief's
 > version (instant, always). Build it behind one `spaces.reclaim_policy`
@@ -654,7 +653,7 @@ cancelled with `close_reason = withdrawn`.
 | Guest (link page) | **Owner's name and phone** | On reclaim; on "space occupied" |
 | Everyone | Owner name and unit on the claims board (no phone) | Always |
 
-**Why this split (C2):** the owner risks the most, so they must be able
+**Why this split (Suggestion 7):** the owner risks the most, so they must be able
 to reach whoever's car is actually in their space, including a guest directly,
 without going through the host. Phone numbers otherwise appear only when two
 people actually need to talk.
@@ -726,7 +725,7 @@ Rules:
 - P4's dedupe key includes `end_utc`, so an extension gets a fresh reminder for the new end.
 - The brief says owners get *exactly one* push, so extensions, cancellations and
   expiries don't notify owners. They appear on the space screen.
-- Managers also get P1 (default, Q8), because covering for an absent owner is
+- Managers also get P1 (default, Suggestion 7), because covering for an absent owner is
   what managers are for. P6 is an coordinator push, not an owner push.
 
 ### 10.1 How sending works (the "outbox")
@@ -761,7 +760,7 @@ key guarantees nobody gets the same push twice.
 ## 11. Sign-in and sessions
 
 There are no passwords, email, SMS or OAuth, so codes need a delivery path that
-isn't SMS or email. Default (Q7):
+isn't SMS or email. Default (Suggestion 10):
 
 1. **Joining:** the coordinator posts a building **join link** (`/join/<join_code>`)
    in the building's existing group chat. A resident opens it, enters name,
@@ -793,7 +792,7 @@ Security details:
 - **Phone numbers aren't verified**, because there's no SMS. A fake number is
   visible to neighbours, and the coordinator can fix or deactivate it.
 
-### 11.1 Coordinator vs maintainer (default, Q9)
+### 11.1 Coordinator vs maintainer (default, Suggestion 10)
 
 | | Coordinator | Maintainer |
 |---|---|---|
@@ -920,7 +919,7 @@ fragments of a page; the rest return full pages or redirects (POST → 303 redir
 | POST | `/coordinator/people/{id}/deactivate` | coord | End rights, cancel bookings, end sessions |
 | POST | `/coordinator/rights/{id}/revoke` | coord | Settle a false or disputed claim |
 | POST | `/coordinator/join-code/rotate` | coord | New join link |
-| GET | `/coordinator/reports/holds` | coord | Repeatedly postponed or unused bookings (C4) |
+| GET | `/coordinator/reports/holds` | coord | Repeatedly postponed or unused bookings (Suggestion 6) |
 | POST | `/coordinator/people/{id}/make-coordinator` | coord | Grant or remove coordinator (logged) |
 | GET | `/coordinator/events` | coord | Browse the event log, including maintainer commands |
 | GET | `/coordinator/events.csv` | coord | Export the event log for v2 analysis |
@@ -993,16 +992,16 @@ What happens when things don't go the happy way. "→ asym" means the asymmetry 
 | E2 | Owner blocks while a requester is booking the same space | Whoever commits second sees the other's result. If the booking won, the block reclaims it (P5). | Same lock. The owner always wins in the end (→ asym). |
 | E3 | Start time is already slightly past (form left open) | Start becomes now if ≤ 15 min past; otherwise "start is in the past" | Tolerate slow fingers, but no retroactive bookings |
 | E4 | End ≤ start | Form error | |
-| E5 | End beyond `BOOKING_HORIZON_DAYS`, or in plan-opened time beyond `PLAN_OPEN_HORIZON_DAYS` | Form error / space not offered ("spaces open by schedule are bookable 7 days ahead") | C3: forgotten schedules shouldn't surprise owners |
-| E6 | Every candidate fails only the margin rule | Offer adjusted windows (§6.2) | Never leave an orphan gap, but still meet the need (Q10) |
+| E5 | End beyond `BOOKING_HORIZON_DAYS`, or in plan-opened time beyond `PLAN_OPEN_HORIZON_DAYS` | Form error / space not offered ("spaces open by schedule are bookable 7 days ahead") | Suggestion 4: forgotten schedules shouldn't surprise owners |
+| E6 | Every candidate fails only the margin rule | Offer adjusted windows (§6.2) | Never leave an orphan gap, but still meet the need (Suggestion 5) |
 | E7 | Request starts later than now but the space is free from now | `gap_before` counts from now. Under 60 min → adjusted window "start now" offered. | A gap from now until a later start is a real orphan |
 | E8 | No space at all | "Nothing free for that window", plus a `search.performed` event with 0 candidates | Unmet demand is v2 data |
 | E9 | Window crosses a DST change | Works: everything is UTC internally, displayed local | §3 |
 | E10 | Requester books a space they own or manage | Allowed. No P1 to themselves. | No reason to forbid it |
 | E11 | Same person holds overlapping bookings | Allowed and logged | "No caps" in v1 |
 | E12 | Guest booking with an empty label | Rejected. No link is generated. | Brief. The owner's P1 needs the label. |
-| E13 | Booking with no plate | Allowed; owner sees "no plate given" | C2: plates are optional |
-| E13a | Pending (unapproved) resident tries to book or claim | Buttons replaced by "waiting for coordinator approval" | Q7 |
+| E13 | Booking with no plate | Allowed; owner sees "no plate given" | Suggestion 3: plates are optional |
+| E13a | Pending (unapproved) resident tries to book or claim | Buttons replaced by "waiting for coordinator approval" | Suggestion 10 |
 
 ### 15.2 Lifecycle
 
@@ -1013,10 +1012,10 @@ What happens when things don't go the happy way. "→ asym" means the asymmetry 
 | E16 | Guest arrives after expiry and taps "I'm parked" | Rejected: "This booking expired at 15:00. Ask Dana to book again." Host phone shown. | Rebooking is the requester's job (→ asym) |
 | E17 | Host taps "mark parked for guest" before start | Button hidden; server rejects too | Brief: never in advance |
 | E18 | Guest and host both tap parked | First wins, second is a no-op with an explanation | Idempotent (§7.2) |
-| E19 | "I'm parked" before start | Rejected, with a **Start now** button if the space is free now (edit) | C4: the previous user may still be there |
-| E19a | Parked but didn't tap | Fine until expiry; P2/P3 remind | C4 |
-| E19b | Guest taps "I'm parked" with no phone on file | Phone field required first | C2 |
-| E19c | Edit start earlier, but the space is booked or closed then | Rejected, showing the earliest possible start | C4 |
+| E19 | "I'm parked" before start | Rejected, with a **Start now** button if the space is free now (edit) | Suggestion 6: the previous user may still be there |
+| E19a | Parked but didn't tap | Fine until expiry; P2/P3 remind | Suggestion 6 |
+| E19b | Guest taps "I'm parked" with no phone on file | Phone field required first | Suggestion 8 |
+| E19c | Edit start earlier, but the space is booked or closed then | Rejected, showing the earliest possible start | Suggestion 6 |
 | E20 | Late push tapped after the state changed (e.g. [I'm parked] after expiry) | Server rejects; the notification opens the booking page explaining why | The server is the source of truth, never the notification |
 | E21 | Server down across an expiry or end time | First sweep after restart applies transitions with **historical** timestamps and skips stale pushes | §7.4 |
 | E22 | Extend when the next booking starts soon | Offer "extend until 17:40" (when the next booking or closed period starts), else "can't extend" | Brief: only if open and unbooked |
@@ -1031,7 +1030,7 @@ What happens when things don't go the happy way. "→ asym" means the asymmetry 
 
 | # | Situation | Behaviour | Why |
 |---|---|---|---|
-| E29 | Owner blocks over a held or parked booking | Booking cancelled (`reclaimed`), P5 to host with owner phone, owner sees host and guest phones, guest page shows owner phone. No confirmation. **Policy open: Q4.** | Brief: always, immediately, no reason (→ asym) |
+| E29 | Owner blocks over a held or parked booking | Booking cancelled (`reclaimed`), P5 to host with owner phone, owner sees host and guest phones, guest page shows owner phone. No confirmation. **Policy open: Suggestion 7.** | Brief: always, immediately, no reason (→ asym) |
 | E30 | Block covers several future bookings | All reclaimed, one P5 each | Same |
 | E31 | Plan edit / "usually here" switch / rule removal closes booked time | Same reclaim. The button label shows "(cancels N bookings)". | Any closing is a reclaim; the label means no surprise |
 | E32 | Owner opens more time | No effect on bookings | |
@@ -1040,8 +1039,8 @@ What happens when things don't go the happy way. "→ asym" means the asymmetry 
 | E35 | Two plans or one-offs tie exactly with opposite effects | Closed wins | Brief |
 | E36 | Plan crosses midnight | Belongs to its start weekday | §3 |
 | E37 | Plan time doesn't exist or happens twice (DST) | Shift forward / first occurrence | §3 |
-| E38 | Second person claims an owned space | Stored as `disputed`; P6 to coordinators; current owner keeps control and isn't notified; claimant sees "waiting for coordinator" | Q8: disputes need a human, not a race |
-| E38a | Coordinator resolves a dispute | co-owner → right becomes `active`; replace → old owner's right ends (`coordinator_replaced`), rules and bookings stay; reject → `rejected` | Q8 |
+| E38 | Second person claims an owned space | Stored as `disputed`; P6 to coordinators; current owner keeps control and isn't notified; claimant sees "waiting for coordinator" | Suggestion 7: disputes need a human, not a race |
+| E38a | Coordinator resolves a dispute | co-owner → right becomes `active`; replace → old owner's right ends (`coordinator_replaced`), rules and bookings stay; reject → `rejected` | Suggestion 7 |
 | E39 | A false claim is discovered after the fact | Coordinator revokes → if it was the only owner, rules removed and bookings withdrawn (P5 without owner phone: "space withdrawn, find another") | §8.5 |
 | E40 | Last owner releases | Rules removed, manager rights end, bookings withdrawn | Nobody is left accountable for the space being open |
 | E41 | A manager right expires | Rules they made stay (rules belong to the space); the owner is still accountable | Their changes were made on the owner's behalf |
@@ -1062,35 +1061,29 @@ What happens when things don't go the happy way. "→ asym" means the asymmetry 
 | E51 | iPhone user hasn't installed the PWA | No pushes; install banner; everything still works in-app | §10.2 |
 | E52 | Coordinator deactivates a space with bookings | Bookings withdrawn, rights ended, space hidden | Spaces are never hard-deleted |
 | E53 | Two app instances on the same DB | Not supported (documented). Dedupe keys prevent double pushes anyway. | One worker (§2) |
-| E54 | Home computer asleep or off | App unreachable; on wake the sweep applies transitions with historical times and skips stale pushes (E21) | Q2 |
-| E55 | Move from home computer to VPS | Copy `/data/parking.db`, point the same domain at the VPS; no reinstall for residents | Q2: origin unchanged |
-| E56 | A string is missing in one language | Falls back to English; a test fails the build if the catalogs differ | Q5 |
+| E54 | Home computer asleep or off | App unreachable; on wake the sweep applies transitions with historical times and skips stale pushes (E21) | Suggestion 2 |
+| E55 | Move from home computer to VPS | Copy `/data/parking.db`, point the same domain at the VPS; no reinstall for residents | Suggestion 2: origin unchanged |
+| E56 | A string is missing in one language | Falls back to English; a test fails the build if the catalogs differ | Suggestion 2 |
 
 ---
 
-## 16. Design items → plan sections
+## 16. Summary sections → plan sections
 
-In the same weight order as DESIGN_DECISIONS.md. The heaviest items should be
-settled first, because they're the most expensive to change once built.
-
-| Tier | Item | Tag | Implemented in |
-|---|---|---|---|
-| Foundations | Q1 Installable web app + push only, and a stable web address | Core idea | §2 (hosting row), §10.2, E55 |
-| Foundations | Q2 Architecture: one process, one SQLite file | Default | §2 table, §2.1a (what changes if Q2 changes), §4.6 locking, §7.4 sweep, E53–E54 |
-| Foundations | C1 Solicitors do nothing extra; clients carry the cost | Core idea | §1, §8.1–8.3, §8.7, P1 in §10 |
-| Foundations | C2 Users, guests, accountability, mutual disputes, optional plates | Core idea | §4.4 vocabulary, §4.6, §8.6, §9 |
-| Foundations | C3 Availability rules and 7/14-day horizons | Core idea | §3, §4.5, §5, `PLAN_OPEN_HORIZON_DAYS` |
-| Foundations | C4 Claim or expire, edits and extensions, records, v2 hook | Core idea | §7, §13, §14 |
-| Structure | C5 Explicit, instant, best-fit booking | Core idea | §6 |
-| Structure | Q3 How owners open and block (screen, presets, Trip, Schedule, two owner types) | Default | §8.1–8.3, §4.5 rules, §5.2 trimming |
-| Structure | Q4 Reclaim policy | **Open** | §8.3 (core idea behind `spaces.reclaim_policy`), E29–E31 |
-| Structure | Q5 Languages | Default | §2 (i18n), `person.locale`, `/lang`, E56 |
-| Structure | Q6 Shabbat and holidays | **Open** | Not yet in the plan. Starting suggestion: a `no_confirmation` booking flag that skips expiry when the booking starts on Shabbat or a holiday (needs a holiday calendar). |
-| Structure | Q7 Registration and sign-in | Default | §4.1 `status`, §11, E13a |
-| Structure | Q8 Owning a space, co-owners, managers (incl. manager P1), disputes | Default | §4.4, §8.1, §8.4–8.5, §10 P1, E38–E42 |
-| Details | Q9 Coordinator vs maintainer | Default | §4.1 `is_coordinator`, §11.1, §12.6 |
-| Details | Q10 Longer-booking suggestion; "space occupied" button | Default | §6.2; §12.2 `report-occupied`/`rebook`, E28 |
-| Details | Q11 Timings | Default | §2.2 config |
+| PARKING_MANAGER_SUGGESTION.md section | Plan sections | Open questions there |
+|---|---|---|
+| 1 The idea | §1 | What counts as success |
+| 2 What kind of app, how it's built | §2, §2.1a, §10.2, E54–E55 | iPhone step; domain name; other languages |
+| 3 What the app keeps track of | §4 | none |
+| 4 When a space is available | §3, §4.5, §5 | none |
+| 5 Finding a space | §6 | Minimum gap; the fitting suggestion |
+| 6 A booking's life | §7, §14 | **Shabbat and holidays** (not yet in the plan: a `no_confirmation` flag that skips expiry for bookings starting on Shabbat or a holiday); timings (§2.2) |
+| 7 The owner's side | §8, §4.4, §5.2 | **Reclaim policy** (§8.3, behind `spaces.reclaim_policy`); presets; trip options; manager P1; claim approval |
+| 8 Guests | §9, §12.3 | none |
+| 9 Notifications | §10 | none |
+| 10 Signing in, who runs the app | §11, §11.1, §12.6 | Approval gate; lost-phone links |
+| 11 Built to learn from | §13, §14 | Post-launch data questions |
+| 12 When things go wrong | §15 | none |
+| 13 How it will be built and checked | §17, §18 | none |
 
 ---
 
