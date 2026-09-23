@@ -39,8 +39,8 @@ the existing one instead of adding another.
    belongs in the commit message. Update comments in the same change as the
    code they describe.
    Notes about unfinished work (TODOs, placeholders) must be accurate and
-   complete: what is missing, why, and where it's tracked (a QUESTIONS.md entry
-   or a PLAN.md section).
+   complete: what is missing, why, and where it's tracked (a PLAN.md section, or
+   a section of the suggestion doc when it needs someone else's decision).
 
 4. **Questions for other people go in the suggestion doc, in plain language.**
    When work needs someone else's input, write it there in the section it
