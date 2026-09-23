@@ -8,12 +8,14 @@ project: the code is meant to be read and understood, not just run.
 | File | Role | Updated when |
 |---|---|---|
 | The code | How the app actually works; the final word | Always, with its comments |
-| QUESTIONS.md | Open problems that need someone else's input, in plain language. Created once the client has replied to the suggestion doc, starting with whatever is still unanswered. | A question comes up or gets answered |
 | PLAN.md | Design reference from before implementation: data model, screens, edge cases, build order | A design choice changes (behaviour, data, rules), not for code-level details |
-| PARKING_MANAGER_SUGGESTION.md | Record of the plain-language plan sent to the client for approval. Kept accurate as a record; will be removed eventually. | Only to fix a mistake, and to add an "Approved on [date]" line at the top once approved |
+| PARKING_MANAGER_SUGGESTION.md | The whole plan in plain language, with the reasoning, the open points and the answers we get back. The version people outside the project read. | A decision is made or a question is answered |
 | README.md | The public front page: what the project is, how to run it | Setup or run steps change |
 
-Update this table whenever a file is added, renamed, moved or changes role.
+Expect more documents as the project grows: notes on one area, a setup guide, a
+record of a decision. Add each one to this table when you create it, with its
+role and when it changes. If a document's job is already covered here, extend
+the existing one instead of adding another.
 
 ## Rules
 
@@ -40,11 +42,11 @@ Update this table whenever a file is added, renamed, moved or changes role.
    complete: what is missing, why, and where it's tracked (a QUESTIONS.md entry
    or a PLAN.md section).
 
-4. **QUESTIONS.md is how we talk to non-technical people.**
-   When work needs someone else's input, add an entry in plain language. Each
-   entry says who should answer, why it matters, and its status, and links to
-   the PLAN.md section or code it affects. Once answered, record the answer and
-   the date, then update the code or PLAN.md to match.
+4. **Questions for other people go in the suggestion doc, in plain language.**
+   When work needs someone else's input, write it there in the section it
+   belongs to: what we need to know and why it matters. When the answer comes
+   back, fold it into that section and update PLAN.md and the code to match, so
+   the document always reads as the current plan rather than a list of debates.
 
 5. **The repository is public.**
    Never commit secrets (notification keys, `.env` files), the database file, or

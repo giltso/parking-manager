@@ -45,6 +45,11 @@ Requesters (demand) are motivated and will put up with friction.
 So owners get defaults, the fewest taps, and no obligations. Requesters get the
 explicit inputs, the confirmations, and the responsibility.
 
+**One deliberate exception:** an owner cannot cancel a booking inside
+`RECLAIM_NOTICE_MINUTES` of its start, or once the car is parked (§8.3). Without
+that, a booking is worth nothing, and the requester side collapses. Outside that
+window the owner still always wins.
+
 I cite this principle by name ("→ asymmetry") wherever it decided something.
 
 v1.0 has no caps, reputation, penalties or payments. It **logs everything** so
@@ -149,7 +154,7 @@ routes only talk to services (§2.1, §13).
 |---|---|---|
 | `TZ_NAME` | `Asia/Jerusalem` | Building time zone |
 | `GRACE_MINUTES` | 60 | A held booking expires this long after its start |
-| `MARGIN_MINUTES` | 60 | Minimum leftover gap (or zero) that best fit may leave |
+| `MARGIN_MINUTES` | 30 | Minimum leftover gap (or zero) that best fit may leave |
 | `EXPIRY_WARNING_MINUTES` | 10 | "About to lose space N" push lead time |
 | `END_WARNING_MINUTES` | 15 | "Extend?" push lead time |
 | `START_PUSH_SKIP_MINUTES` | 5 | Skip the "taking it?" push if the booking was made this close to its start |
@@ -157,6 +162,8 @@ routes only talk to services (§2.1, §13).
 | `FIT_LOOKAROUND_HOURS` | 24 | How far before/after a window we look when measuring free time |
 | `BOOKING_HORIZON_DAYS` | 14 | How far ahead a booking may end (Suggestion 4) |
 | `PLAN_OPEN_HORIZON_DAYS` | 7 | Time opened by a recurring **plan** is shown and bookable only this far ahead. Manual one-off openings may be created any distance ahead and are bookable within `BOOKING_HORIZON_DAYS` (Suggestion 4). |
+| `RECLAIM_NOTICE_MINUTES` | 30 | An owner may cancel a booking only while it starts more than this far ahead, and only while it is `held` (§8.3) |
+| `DEFAULT_LOCALE` | `he` | Language for new people and for guests whose browser says nothing |
 | `TICK_SECONDS` | 30 | Background sweep interval |
 | `SESSION_DAYS` | 180 | Session lifetime, extended on each visit |
 | `DATABASE_PATH` | `/data/parking.db` | |
@@ -207,10 +214,10 @@ so a bug in Python can't store an impossible row.
 |---|---|---|
 | name | text, required | Shown to neighbours |
 | phone | text, required | Normalised to E.164 (`+9725…`). Shown only in specific situations (§8.6). |
-| unit | text, required | **Display only.** Nothing in the app keys off it. |
-| is_coordinator | bool | In-app operations role (default, Suggestion 10): seeds spaces, approves sign-ups, issues sign-in links, settles disputed claims, deactivates users, sees reports. Proposed at launch: the client, the building manager and the tenant leader. The **maintainer** is not a flag: they have no in-app powers (§11.1). |
+| unit | text, required | The apartment. `space.unit` points at the same building records, which is how a coordinator knows whose space is whose. |
+| is_coordinator | bool | In-app operations role (default, Suggestion 10): seeds spaces, approves sign-ups, issues sign-in links, corrects space assignments, deactivates users, sees reports. Proposed at launch: the client, the building manager and the tenant leader. The **maintainer** is not a flag: they have no in-app powers (§11.1). |
 | status | `pending` / `approved` / `rejected` / `deactivated` | Sign-up creates `pending`. Only `approved` people may book, claim or be granted rights (default, Suggestion 10). Deactivation replaces deletion, so the history stays intact. |
-| locale | `en` / `he` | Chosen by the person; suggested from the browser at sign-up (default, Suggestion 2) |
+| locale | `en` / `he` | Chosen by the person; defaults to `DEFAULT_LOCALE`, suggested from the browser at sign-up (Suggestion 2) |
 
 ### 4.2 `plate`
 
@@ -224,6 +231,7 @@ so a bug in Python can't store an impossible row.
 | Column | Type | Notes |
 |---|---|---|
 | label | text, unique | The number painted on the floor. Stored as **text** in case the plan has "B-12" or "12A". Sorted "naturally" (2 before 10). |
+| unit | text, nullable | The apartment this space belongs to in the building's records. A coordinator fills it in when seeding, and it drives the assignment list. |
 | is_active | bool | Coordinator deactivates instead of deleting |
 
 ### 4.4 `space_right`
@@ -235,14 +243,14 @@ so a bug in Python can't store an impossible row.
 | role | `owner` / `manager` | CHECK |
 | valid_from_utc | text | |
 | valid_to_utc | text, nullable | null = until released/revoked |
-| status | `active` / `disputed` / `rejected` | A claim on an already-owned space is `disputed` until a coordinator decides (default, Suggestion 7) |
-| granted_by | FK person, nullable | null for a self-claim |
+| status | `active` / `ended` | Rights are created by a coordinator (Suggestion 7), so there is no disputed state to resolve in the app. A wrong assignment is corrected by a coordinator. |
+| granted_by | FK person | The coordinator who assigned the space, or the owner who added a co-owner or manager |
 | ended_reason | nullable: `released` / `revoked` / `coordinator_revoked` / `coordinator_replaced` / `expired` | |
 
 A right is **active at t** if `valid_from_utc <= t < valid_to_utc` (or `valid_to_utc` is null).
 Ending a right sets `valid_to_utc = now`; rows are never deleted. That way the
-public claims board can show history ("Dana claimed 42 on 3 Sep"), which is what
-makes false claims visible.
+public list of spaces can show history ("space 42 assigned to apartment 7 on
+3 Sep"), so a mistaken assignment can always be traced.
 
 | Role | Set rules (open/block) | Reclaim | Grant/revoke rights | Gets P1 push |
 |---|---|---|---|---|
@@ -458,16 +466,16 @@ free for 20 minutes") from being left behind.
 Space D  free 14:00–17:00   gaps 0 / 0      ✔ total 0     → rank 1
 Space A  free 13:00–18:00   gaps 60 / 60    ✔ total 120   → rank 2
 Space C  free 10:00–17:00   gaps 120 / 0    ✔ total 120   → rank 3 (label tiebreak)
-Space B  free 14:00–17:30   gaps 0 / 30     ✘ 30-min orphan → not offered
+Space B  free 14:00–17:20   gaps 0 / 20     ✘ 20-min orphan → not offered
 ```
 
 ### 6.2 When nothing survives
 
-If every bookable space fails only the margin rule, show **adjusted windows**
-(default, Suggestion 5): stretch the request to the edge of the small gap so the gap becomes zero.
-Space B above would be offered as "Space B fits if you book **14:00–17:30**".
-The adjusted window always *contains* the original, so the requester still gets
-everything they asked for. They pay the cost by holding it longer (→ asymmetry).
+**Not in v1 (Suggestion 5).** If every bookable space fails only the margin rule,
+say so plainly: "nothing free for that window", and log the search with zero
+candidates. Suggesting a stretched window ("Space B fits if you book
+14:00–17:20") is a v2 idea; the unmet-search log is what tells us whether it's
+worth building.
 
 ### 6.3 Booking
 
@@ -508,7 +516,7 @@ stateDiagram-v2
 | held → cancelled | Cancel | host (or guest via link) | | cancelled |
 | parked → ended | sweep | system | now ≥ end_utc | ended |
 | parked → ended | Release | host (or guest via link) | | released |
-| held/parked → cancelled | Owner/manager blocks over it | owner, manager | | reclaimed |
+| held → cancelled | Owner/manager blocks over it | owner, manager | `start_utc − now > RECLAIM_NOTICE_MINUTES` (§8.3). A `parked` booking is never cancelled this way. | reclaimed |
 | held/parked → cancelled | Last owner releases / coordinator revokes / space deactivated | owner, coordinator | | withdrawn |
 | held/parked → cancelled | "Space is occupied, find me another" | host / guest | | occupied |
 | (held/parked) extend | Extend | host (or guest via link) | Space open & unbooked from `end` to `new_end` | |
@@ -570,10 +578,14 @@ look held for up to 30 seconds after it expired, and block a search for no reaso
 
 ## 8. Owner side
 
-### 8.1 Claiming, with onboarding in the same tap
+### 8.1 Assignment, with onboarding in the same tap
 
-On `/spaces` (the public claims board), an unclaimed space shows a **Claim** button.
-That opens one question with two big buttons:
+A coordinator seeds the spaces with the apartment each belongs to, then assigns
+each space to a resident (§12.6). Residents do not claim spaces themselves: the
+building's records already say whose space is whose, which is simpler and leaves
+nothing to dispute (Suggestion 7).
+
+The new owner opens the space once and answers one question with two big buttons:
 
 > **Space 42: where is your car usually?**
 > [ Usually here ] [ Usually away ]
@@ -581,14 +593,12 @@ That opens one question with two big buttons:
 - *Usually here* → owner right created, **no rules** (base state closed).
 - *Usually away* → owner right plus **one plan**: open, all 7 days, 00:00–24:00, from today, no end.
 
-That's one screen and one tap (→ asymmetry). A claim on a space that **already has
-an active owner** isn't rejected. It's stored as `disputed`, P6 goes to the
-coordinators, and the current owner keeps full control and is not notified. The
-coordinator approves it as co-owner, replaces the owner, or rejects it (default, Suggestion 7). The
-claim screen has one line noting that guests may see the owner's phone in a
-dispute (Suggestion 7). The board lists every space with
-its owner's name, unit and "since" date, plus claim history, so every resident
-can spot a false claim.
+That's one screen and one tap (→ asymmetry). The screen carries one line noting
+that guests may see the owner's phone in a dispute (Suggestion 7).
+
+`/spaces` lists every space with its apartment, its owner's name and the date it
+was assigned, plus past assignments. It is a public record, not a claim board:
+there is no Claim button. A wrong assignment is fixed by a coordinator.
 
 ### 8.2 The owner's space screen
 
@@ -598,31 +608,46 @@ can spot a false claim.
   - If open now: **Block** → `next 3 h` · `rest of today` · `until tomorrow 08:00` · `until I unblock`
   - If closed now: **Open** → `rest of today` · `until tomorrow 08:00` · `until I close it`
 - Tapping an active block or open period on the strip shows **Remove**, also one tap.
-- Behind a small link, two optional tools, never required:
+- Behind a small link, three optional tools, never required:
+  - **Calendar:** pick an exact start and end (date and time) → one one-off rule.
   - **Trip:** pick a start and end date → one open one-off rule.
   - **Schedule:** weekdays and times → a recurring plan.
+
+  Both the presets and the calendar ship in v1 and both are logged, so we can see
+  which owners actually use (Suggestion 7, still open).
 - A toggle to switch between *usually here* and *usually away*.
+- A quiet line at the foot of the screen, never a push: "your space was used 3
+  times this month, by 2 neighbours". It is the only thanks the app gives an
+  owner, and it comes from the event log (§14), so it costs nothing to compute.
 
 ### 8.3 What a preset tap does
 
-> **Reclaim policy is open (Suggestion 7, needs the client's answers):** whether a *parked*
-> car gets notice time, whether future bookings can be cancelled right up to
-> their start, and whether repeated reclaims are visible. Below is the brief's
-> version (instant, always). Build it behind one `spaces.reclaim_policy`
-> function so the answer changes one place.
+**Reclaim policy (Suggestion 7).** One function, `spaces.reclaim_policy(booking, now)`,
+answers "may this block cancel that booking?" so the rule lives in one place:
+
+| Booking state | Starts more than 30 min away | Starts within 30 min, or already parked |
+|---|---|---|
+| `held` | Cancelled (`reclaimed`), P5 to the host | **Not cancelled.** Both sides get each other's phone (P5b). |
+| `parked` | **Not cancelled**, ever | **Not cancelled.** Both sides get each other's phone (P5b). |
+
+The closed rule is still created either way, so the space closes after that
+booking finishes. Only the cancellation is held back.
 
 1. Creates a one-off rule for the chosen period, starting now.
 2. Trims or splits the owner's existing one-offs of the **opposite** effect that
    overlap that period, so the latest tap is what the owner sees (§5.2).
-3. **Reclaims** every held or parked booking that overlaps the newly closed time:
-   cancels it (`close_reason = reclaimed`) and pushes the host immediately with
-   the owner's phone. The owner's screen shows the host's phone.
+3. **Reclaims** every overlapping booking the policy allows: cancels it
+   (`close_reason = reclaimed`) and pushes the host immediately with the owner's
+   phone. The owner's screen shows the host's phone.
+4. For overlapping bookings the policy protects, cancels nothing and shows the
+   owner the host's (and guest's) phone, with a "call" action. The host gets P5b.
 
 **Reclaim is not a separate feature. It's what blocking does when a booking is
 in the way.** When a block would cancel bookings, the button label says so:
-`rest of today (cancels Dana's booking)`. It's still one tap, with no
-confirmation dialog and no reason asked (→ asymmetry). The label is there so the
-tap is never a surprise.
+`rest of today (cancels Dana's booking)`. When a booking is protected, the label
+says that instead: `rest of today (space is taken until 18:00 — tap to call Dana)`.
+Either way it is one tap, with no confirmation dialog and no reason asked
+(→ asymmetry).
 
 The same reclaim step runs whenever **any** change closes booked time: editing
 a plan, switching to *usually here*, or removing an open one-off.
@@ -651,7 +676,7 @@ cancelled with `close_reason = withdrawn`.
 | Host | Owner's name and phone | On reclaim; on "space occupied" |
 | Guest (link page) | Host's name and phone | Always |
 | Guest (link page) | **Owner's name and phone** | On reclaim; on "space occupied" |
-| Everyone | Owner name and unit on the claims board (no phone) | Always |
+| Everyone | Owner name and unit on the public space list (no phone) | Always |
 
 **Why this split (Suggestion 7):** the owner risks the most, so they must be able
 to reach whoever's car is actually in their space, including a guest directly,
@@ -704,12 +729,13 @@ mark someone as parked.
 
 | # | Trigger | Recipient | Message | Actions | Dedupe key |
 |---|---|---|---|---|---|
-| P1 | Booking created | Every active **owner and manager** of the space, except the host | "Space 42 booked 14:00–18:00: *Mum* (guest of Dana, unit 7)" or "…by Dana (unit 7), 12-345-67" | none (tap opens space screen) | `booked:{booking}` |
+| P1 | Booking created | Every active **owner and co-owner** of the space, except the host (managers do not get it, Suggestion 7) | "Space 42 booked 14:00–18:00: *Mum* (guest of Dana, unit 7)" or "…by Dana (unit 7), 12-345-67" | none (tap opens space screen) | `booked:{booking}` |
 | P2 | now ≥ start, still held | Host | "Space 42: taking it?" | [I'm parked] [Release it] | `start:{booking}` |
 | P3 | now ≥ expiry − 10 min, still held | Host | "About to lose space 42 at 15:00" | [I'm parked] | `expiry:{booking}` |
 | P4 | now ≥ end − 15 min, parked | Host | "Space 42 ends at 18:00" | [Extend +1h] (dismiss = do nothing) | `end:{booking}:{end_utc}` |
 | P5 | Reclaim (immediate) | Host | "Space 42 was reclaimed by its owner. Call Avi 050-…" | [Call] [Find another space] | `reclaim:{booking}` |
-| P6 | Sign-up waiting, or a disputed claim | All coordinators | "Dana (unit 7) is waiting for approval" / "Space 42 claim disputed" | none (opens coordinator page) | `signup:{person}` / `dispute:{right}` |
+| P5b | Block blocked by the notice rule (§8.3) | Host **and** the owner who tapped | "Space 42: the owner needs it back. Call Avi 050-…" / "Space 42 is taken until 18:00. Call Dana 050-…" | [Call] | `notice:{booking}` |
+| P6 | Sign-up waiting | All coordinators | "Dana (unit 7) is waiting for approval" | none (opens coordinator page) | `signup:{person}` |
 
 Every push is rendered in the **recipient's** `locale`.
 
@@ -766,7 +792,7 @@ isn't SMS or email. Default (Suggestion 10):
    in the building's existing group chat. A resident opens it, enters name,
    phone, unit, language and (optionally) plates, and gets a session straight
    away, but with `status = pending`. A pending person sees "waiting for
-   approval" and can browse the claims board, but can't book, claim or be
+   approval" and can browse the space list, but can't book or be
    granted rights. Coordinators get P6 and approve or reject from `/coordinator/people`.
    The coordinator can also rotate the join code.
 2. **Another device:** on a signed-in phone, *Me → Sign in another device*
@@ -875,11 +901,12 @@ fragments of a page; the rest return full pages or redirects (POST → 303 redir
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| GET | `/spaces` | res | Public claims board and history |
+| GET | `/spaces` | res | Public list of spaces, their apartments, owners and assignment history |
 | GET | `/spaces/{id}` | res | Public view; owners/managers get controls |
 | GET | `/spaces/{id}/strip` | res | **Partial:** 7-day timeline |
-| POST | `/spaces/{id}/claim` | res | `usually=here\|away` → owner right (+ plan), or a `disputed` right if already owned |
-| POST | `/spaces/{id}/release` | own | Release own claim (§8.5) |
+| POST | `/spaces/{id}/onboard` | own | `usually=here\|away` → sets the starting rules for a newly assigned space (§8.1) |
+| POST | `/spaces/{id}/release` | own | Give up the space; it returns to the coordinator (§8.5) |
+| POST | `/spaces/{id}/calendar` | mgr | Open or block an exact window picked on the calendar (§8.2) |
 | POST | `/spaces/{id}/block` | mgr | `preset=3h\|today\|tomorrow_am\|indefinite` (reclaims) |
 | POST | `/spaces/{id}/open` | mgr | `preset=today\|tomorrow_am\|indefinite` |
 | POST | `/spaces/{id}/usually` | mgr | Switch here ⇄ away |
@@ -913,11 +940,12 @@ fragments of a page; the rest return full pages or redirects (POST → 303 redir
 | GET | `/coordinator/people` | coord | Resident list, pending sign-ups first |
 | POST | `/coordinator/people/{id}/approve` | coord | `pending` → `approved` |
 | POST | `/coordinator/people/{id}/reject` | coord | `pending` → `rejected`, sessions ended |
-| GET | `/coordinator/disputes` | coord | Disputed claims with both parties' details and claim history |
+| POST | `/coordinator/spaces/{id}/assign` | coord | Give the space to a resident (creates the owner right) |
+| POST | `/coordinator/spaces/{id}/unassign` | coord | End the current owner right (rules removed, future bookings withdrawn) |
 | POST | `/coordinator/disputes/{right_id}/resolve` | coord | `decision=coowner\|replace\|reject` (replace ends the old owner's right: rules kept, bookings kept) |
 | POST | `/coordinator/people/{id}/signin-link` | coord | Issue 7-day sign-in link |
 | POST | `/coordinator/people/{id}/deactivate` | coord | End rights, cancel bookings, end sessions |
-| POST | `/coordinator/rights/{id}/revoke` | coord | Settle a false or disputed claim |
+| POST | `/coordinator/rights/{id}/revoke` | coord | End a wrong or outdated right |
 | POST | `/coordinator/join-code/rotate` | coord | New join link |
 | GET | `/coordinator/reports/holds` | coord | Repeatedly postponed or unused bookings (Suggestion 6) |
 | POST | `/coordinator/people/{id}/make-coordinator` | coord | Grant or remove coordinator (logged) |
@@ -973,7 +1001,8 @@ An append-only `event` row is written in the same transaction as the change:
 | `booking.edited` | old start/end, new start/end, actor (host/guest), postponed yes/no |
 | `booking.withdrawn` / `booking.occupied` | reason |
 | `rule.created` / `rule.removed` / `rule.trimmed` | full rule snapshot |
-| `right.claimed` / `right.granted` / `right.released` / `right.revoked` | role, dates |
+| `right.assigned` / `right.granted` / `right.released` / `right.revoked` | role, dates, who did it |
+| `booking.reclaim_blocked` | which booking the notice rule protected, and how far it was from starting |
 | `search.performed` | window, kind, number of candidates, number of adjusted suggestions (**unmet demand** is the most important v2 input) |
 | `push.sent` / `push.failed` | kind |
 | `person.joined` / `person.deactivated` | |
@@ -1031,16 +1060,17 @@ What happens when things don't go the happy way. "→ asym" means the asymmetry 
 | # | Situation | Behaviour | Why |
 |---|---|---|---|
 | E29 | Owner blocks over a held or parked booking | Booking cancelled (`reclaimed`), P5 to host with owner phone, owner sees host and guest phones, guest page shows owner phone. No confirmation. **Policy open: Suggestion 7.** | Brief: always, immediately, no reason (→ asym) |
-| E30 | Block covers several future bookings | All reclaimed, one P5 each | Same |
-| E31 | Plan edit / "usually here" switch / rule removal closes booked time | Same reclaim. The button label shows "(cancels N bookings)". | Any closing is a reclaim; the label means no surprise |
+| E29a | Owner blocks time a booking already covers, within 30 min of its start or already parked | Nothing is cancelled; both sides get each other's phone (P5b); the closed rule still applies afterwards | §8.3: a booking that close is worth trusting |
+| E30 | Block covers several future bookings | Each one is judged by the notice rule: the far ones are reclaimed with a P5, the near ones protected with a P5b | Same |
+| E31 | Plan edit / "usually here" switch / rule removal closes booked time | Same rule, same policy function. The label shows "(cancels N bookings)" and names any it can't cancel. | Any closing is a reclaim; the label means no surprise |
 | E32 | Owner opens more time | No effect on bookings | |
 | E33 | Owner taps Block, then Open inside it (or the other way round) | The latest tap trims the opposite one-off, so what the owner sees is what they tapped | §5.2 / §8.3 |
 | E34 | Owner parks in their own "usually away" space without blocking | The app can't know. A requester may arrive to find it taken → E28. | Physical reality. `occupied` reports reveal it. |
 | E35 | Two plans or one-offs tie exactly with opposite effects | Closed wins | Brief |
 | E36 | Plan crosses midnight | Belongs to its start weekday | §3 |
 | E37 | Plan time doesn't exist or happens twice (DST) | Shift forward / first occurrence | §3 |
-| E38 | Second person claims an owned space | Stored as `disputed`; P6 to coordinators; current owner keeps control and isn't notified; claimant sees "waiting for coordinator" | Suggestion 7: disputes need a human, not a race |
-| E38a | Coordinator resolves a dispute | co-owner → right becomes `active`; replace → old owner's right ends (`coordinator_replaced`), rules and bookings stay; reject → `rejected` | Suggestion 7 |
+| E38 | Two residents say the same space is theirs | Not possible in the app: only a coordinator assigns. They correct the assignment (E38a) | Suggestion 7: the building's records decide, not a race |
+| E38a | Coordinator corrects an assignment | Old owner right ends (`coordinator_replaced`), the new one starts; the space's rules and its bookings stay as they are | Suggestion 7 |
 | E39 | A false claim is discovered after the fact | Coordinator revokes → if it was the only owner, rules removed and bookings withdrawn (P5 without owner phone: "space withdrawn, find another") | §8.5 |
 | E40 | Last owner releases | Rules removed, manager rights end, bookings withdrawn | Nobody is left accountable for the space being open |
 | E41 | A manager right expires | Rules they made stay (rules belong to the space); the owner is still accountable | Their changes were made on the owner's behalf |
@@ -1072,12 +1102,12 @@ What happens when things don't go the happy way. "→ asym" means the asymmetry 
 | PARKING_MANAGER_SUGGESTION.md section | Plan sections | Open questions there |
 |---|---|---|
 | 1 The idea | §1 | What counts as success |
-| 2 What kind of app, how it's built | §2, §2.1a, §10.2, E54–E55 | iPhone step; domain name; other languages |
+| 2 What kind of app, how it's built | §2, §2.1a, §10.2, E54–E55 | Where it finally runs (§2 hosting row) |
 | 3 What the app keeps track of | §4 | none |
 | 4 When a space is available | §3, §4.5, §5 | none |
-| 5 Finding a space | §6 | Minimum gap; the fitting suggestion |
-| 6 A booking's life | §7, §14 | **Shabbat and holidays** (not yet in the plan: a `no_confirmation` flag that skips expiry for bookings starting on Shabbat or a holiday); timings (§2.2) |
-| 7 The owner's side | §8, §4.4, §5.2 | **Reclaim policy** (§8.3, behind `spaces.reclaim_policy`); presets; trip options; manager P1; claim approval |
+| 5 Finding a space | §6 | none (30-minute gap; the stretched-window suggestion is v2, §6.2) |
+| 6 A booking's life | §7, §14 | none (Shabbat needs no special case: someone who won't tap a phone then won't drive then) |
+| 7 The owner's side | §8, §4.4, §5.2 | Presets vs calendar: both built, decide after testing (§8.2) |
 | 8 Guests | §9, §12.3 | none |
 | 9 Notifications | §10 | none |
 | 10 Signing in, who runs the app | §11, §11.1, §12.6 | Approval gate; lost-phone links |
@@ -1094,12 +1124,12 @@ Each step ends with tests passing and something you can click.
 1. **Skeleton:** `git init`, Dockerfile, pinned requirements, FastAPI app, migrations, `/healthz`, base template (EN/HE, LTR/RTL), HTMX vendored.
 2. **Time + availability core:** `timeutil`, `compute_timeline`, narrowness key. Heavy unit tests, including DST.
 3. **People & sign-in:** join link, coordinator approval, device codes, sessions, maintainer CLI (logged), `/me`, language choice.
-4. **Spaces & owners:** coordinator seeding, claims board, claim + onboarding, space screen with presets, rights.
+4. **Spaces & owners:** coordinator seeding and assignment, public space list, onboarding question, space screen with presets and calendar, rights.
 5. **Finding & booking:** best fit, margin, adjusted windows, create booking, my bookings.
 6. **Lifecycle:** sweep loop, claim/edit/cancel/extend, reclaim, occupied/rebook, event log.
 7. **Guest flow:** token pages, guest phone, start-now, host fallback claim.
 8. **Push & PWA:** manifest, icons, service worker, subscriptions, outbox, P1–P6.
-9. **Coordinator & export:** approvals, disputes, deactivation, events CSV.
+9. **Coordinator & export:** approvals, assignment fixes, deactivation, events CSV.
 10. **Hardening:** CSRF check, rate limits, backup notes, deployment doc (home: Cloudflare Tunnel; later: VPS + Caddy).
 
 ---

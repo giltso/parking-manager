@@ -4,8 +4,9 @@ A plain-language walk through the plan for the building's parking-sharing app:
 what it does, why each choice was made, how some choices changed along the way,
 and which questions are still open.
 
-**Status:** Nothing is built yet. Everything here is the current plan and can
-change. The technical version is [PLAN.md](PLAN.md), in the same order.
+**Status:** Approved by the building on 23 September 2026. The answers that came
+back are integrated below, so this is the current plan. Nothing is built yet.
+The technical version is [PLAN.md](PLAN.md), in the same order.
 
 **Why keep this:** once the app runs, we'll compare what happened with what we
 expected. Writing the reasons down now lets us tell later whether a choice was
@@ -15,13 +16,14 @@ wrong, or whether the reason behind it no longer applies.
 - **Owner:** a resident who has a parking space and may lend it.
 - **Client:** a resident who books a space, for their own car or for a guest.
 - **Guest:** a visitor with no account, using a link from the client who booked.
-- **Coordinator:** a trusted person who runs the building's side (approvals, disputes).
+- **Coordinator:** a trusted person who runs the building's side (assigns spaces, approvals).
 - **Maintainer:** the person who builds and runs the program itself.
 
 ## 1. The idea
 
-About 100 apartments share one car park. Most residents already have a space or
-a private arrangement, so free spaces are common but come at irregular times.
+About 25 apartments share one car park. Most spaces belong to a particular
+apartment and a few are shared. Most residents already have a space or a private
+arrangement, so free spaces are common but come at irregular times.
 Demand is occasional and comes from two places: a resident needs a space for a
 **visiting guest**, or has **more cars than spaces**.
 
@@ -33,9 +35,9 @@ clients give exact times, confirm arrival, and extend or rebook themselves.
 Version 1 has no fees, limits, ratings or penalties. Instead, everything is
 recorded, so later rules can be based on how people really behaved.
 
-**Open questions**
-- What counts as success after three months: bookings made, owners sharing, or
-  fewer parking arguments?
+**How we'll judge it:** two measures chosen by the building: how many owners
+share their space, and how many bookings get made. We'll also record how often an
+offered space actually gets used.
 
 ## 2. What kind of app it is and how it's built
 
@@ -43,14 +45,15 @@ recorded, so later rules can be based on how people really behaved.
 - A **website that installs to the phone's home screen**, with no App Store.
 - **Phone notifications** are the only channel. No SMS, no email.
 - **One program and one database file** on a single machine.
-- **English and Hebrew**, chosen per person. Hebrew reads right to left.
+- **Hebrew and English**, chosen per person. Hebrew is the default and reads right to left.
 - A **home computer for testing**, then a rented server, under the building's
   **own web address** from launch.
 
 **Why**
 - One version works on iPhone and Android, with no store approval, and guests
   just open a link.
-- SMS and email cost money every month and need outside accounts.
+- SMS costs money for every message. Email needs a sending service and setup so
+  messages don't land in spam. Phone notifications need neither.
 - For one building, one program and one file is plenty. It's cheap, easy to back
   up, and simple enough for a beginner to fix.
 - Right-to-left layout has to be built in from day one. Adding it later would
@@ -70,23 +73,35 @@ server later, then "a domain is required before version 1 but not for testing".
 We also separated where the app runs (cheap to change) from how it's built
 (expensive to change).
 
-**Open questions**
-- Is the iPhone extra step acceptable for residents?
-- What should the web address (domain) be called?
-- Are any other languages common in the building?
+**Answered:** the iPhone step is fine, since the app is used rarely. Hebrew and
+English are enough, and Hebrew is what most residents will use. The web address
+is "jab-parky" for now; the exact name can be settled before launch, as long as
+it has no underscore in it, which web addresses don't allow.
+
+**Still open:** where it finally runs. Ordinary web hosting, the sort that hosts
+a personal site, usually can't keep a program running, and this app has to run
+all the time to send reminders. A small rented server (from roughly $5 a month)
+or a cloud service can. The home computer is enough while we build and test.
 
 ## 3. What the app keeps track of
 
-- **People:** name, phone, apartment (display only), language, approved or not.
+- **People:** name, phone, apartment, language, and whether a coordinator has approved them.
 - **Licence plates:** optional; a person can have several.
-- **Spaces:** the numbers painted on the floor, entered once by a coordinator.
-- **Who holds a space:** **owners** (including co-owners) and **managers**, who
-  stand in while an owner is away.
+- **Spaces:** the numbers painted on the floor, each with the apartment it
+  belongs to. A coordinator enters this list once, from the building's records.
+- **Who holds a space:** a coordinator assigns each space to its resident, who
+  becomes its **owner**. An owner can add a **co-owner**, such as a partner, or a
+  **manager** who stands in while they're away.
 - **Openings and blocks**, **bookings**, and **the record** of every action.
 
-**Why:** Nothing is truly deleted. Old claims, removed openings and cancelled
-bookings stay in the history, so neighbours can spot a false claim and we get
-real data later.
+**Why:** Nothing is truly deleted. Past assignments, removed openings and
+cancelled bookings stay in the history, so a mistake can always be traced and we
+get real data later.
+
+**How we got here:** residents were going to claim their own spaces in public, so
+a false claim would be visible to everyone. The building already knows which
+space belongs to which apartment, so a coordinator enters that list instead.
+It's simpler, and there's nothing to argue about.
 
 ## 4. When is a space available?
 
@@ -117,9 +132,9 @@ forgotten, and shouldn't find bookings weeks out.
 - Start defaults to now. End is required and defaults to the rest of today, or
   tomorrow 08:00 if it's late evening.
 - The app offers the space whose free time **fits the request most tightly**, and
-  never one that would leave a leftover gap under 60 minutes.
-- If no space fits, it suggests the space that would fit with the smallest change
-  to the times ("Space 12 fits if you book until 17:30").
+  never one that would leave a leftover gap under 30 minutes.
+- If no space fits, it says so. Suggesting a nearby window that would fit is a
+  job for a later version.
 - Booking is **instant**. If two people tap the same space at once, the first
   gets it and the second is shown the next best.
 
@@ -127,9 +142,8 @@ forgotten, and shouldn't find bookings weeks out.
 periods stay available for people who need them, and tiny leftovers help no one.
 Instant booking means the client knows the space number before going down.
 
-**Open questions**
-- Is 60 minutes the right minimum gap?
-- Should this "smallest change" suggestion be in version 1?
+**Answered:** the smallest useful gap is 30 minutes, and the "nearby window"
+suggestion waits for a later version.
 
 ## 6. A booking's life
 
@@ -154,24 +168,23 @@ visible: a start pushed back again and again shows up in a report.
 Moving the start later was allowed on condition that every change stays visible
 in the record.
 
-**Open questions**
-- **Shabbat and holidays:** people who don't use phones can't tap "I'm parked",
-  so their booking would expire. Starting suggestion: a "no confirmation needed"
-  option, only for bookings starting on Shabbat or a holiday. Right approach?
-  Which holidays count?
-- Are the timings right: 60 minutes to confirm, and reminders at the start, 10
-  minutes before expiry and 15 minutes before the end?
+**Answered:** no special handling for Shabbat and holidays. Someone who doesn't
+use a phone then doesn't drive then either. The timings above stand for now, and
+they're settings we can change without new code.
 
 ## 7. The owner's side
 
-**Getting started:** claim a space and answer one question, "Is your car usually
-here or usually away?" *Here* keeps the space closed; *away* opens it all week.
+**Getting started:** a coordinator assigns the space to its resident. The owner
+answers one question, "Is your car usually here or usually away?" *Here* keeps
+the space closed; *away* opens it all week. Nothing else is required of them.
 
 **The owner's screen:** the status (open, closed, or who booked it), this week at
 a glance, and one row of buttons.
 - When open: **Block** → *next 3 hours · rest of today · until tomorrow 08:00 · until I undo it*
 - When closed: **Open** → *rest of today · until tomorrow 08:00 · until I close it*
-- **Trip** (two dates) and **Schedule** (a weekly routine) sit behind a small link.
+- Behind a small link: a **calendar** for an exact window, a **trip** (two dates)
+  and a **schedule** (a weekly routine). We'll build both the quick buttons and
+  the calendar, then see which owners actually use.
 
 | | Needs the space most days | Rarely uses the space |
 |---|---|---|
@@ -187,13 +200,20 @@ covered three ways: recurring openings only reach a week ahead, the owner is
 told whenever the space is booked, and a client who finds the space taken has a
 "space occupied" button that finds another space.
 
-**Taking the space back:** blocking booked time warns first ("rest of today,
-cancels Dana's booking"), then cancels that booking. Both sides see each other's phone.
+**Taking the space back:** an owner can cancel a booking on their space until
+**30 minutes before it starts**. The button warns first ("rest of today, cancels
+Dana's booking"). Inside that last half hour, and once a car is actually there,
+the app stops cancelling and shows both phone numbers instead, so the two
+neighbours sort it out themselves. Blocking time nobody has booked is always free.
+
+**Why the half hour:** someone who has already set out, or parked and walked
+away, can't be bumped by a tap. It's the one place where the client's certainty
+beats the owner's convenience, and it's what makes a booking worth trusting.
 
 **Sharing control:** an owner can add a co-owner or a manager. Only a
-coordinator can remove a co-owner, so one co-owner can't lock out the other. A
-claim on an already-owned space goes to a coordinator. Meanwhile the owner isn't
-asked anything.
+coordinator can remove a co-owner, so one co-owner can't lock out the other.
+Spaces are assigned by a coordinator, so there is nothing to argue over in the
+app itself.
 
 **Phones and obligations:** owners always see who booked, including the guest's
 phone. In a dispute, everyone involved sees each other's number. The public list
@@ -205,14 +225,22 @@ sharing started one-way (guests couldn't see the owner's number). It became
 mutual, because owners must be able to reach a misbehaving guest, and a bumped
 guest must be able to reach the owner.
 
-**Open questions**
-- **Reclaiming (needs the client):** is it instant even if a car is parked, or
-  does a parked car get notice time? Can future bookings be cancelled right up to
-  their start? Should repeated reclaims be visible?
-- Are the block and open durations right? Add "until after Shabbat"?
-- Is picking trip dates acceptable, or add quick options like "this weekend"?
-- Should managers also get "your space was booked"?
-- Should claiming an unclaimed space need a coordinator's approval?
+**Keeping it worth an owner's while:** lending has to feel good, not just be
+painless.
+- The space is theirs by default and stays closed until they open it. Doing
+  nothing is always a valid answer.
+- Opening or blocking is one tap; the calendar is there only for people who want
+  exact windows.
+- The owner sees who is in their space: name, apartment, and the car's plate if
+  it was given.
+- An owner who lends gets something back to look at: how many times their space
+  was used and how many neighbours they helped. It's shown in the app, never
+  pushed at them.
+- Ideas for later, once there's data: letting people who share get first choice
+  when they need a space themselves.
+
+**Still open:** whether owners prefer the quick buttons or the calendar. We'll
+build both and decide after testing.
 
 ## 8. Guests
 
@@ -237,12 +265,12 @@ the space.
 
 | When | Who | Buttons |
 |---|---|---|
-| A space is booked | Its owners (and managers) | none |
+| A space is booked | Its owners and co-owners | none |
 | Booking starts, not yet parked | The client | I'm parked · Release |
 | 10 minutes before expiry | The client | I'm parked |
 | 15 minutes before the end | The client | Extend |
 | An owner takes the space back | The client, with the owner's phone | Call · Find another |
-| Someone signs up, or a claim is disputed | Coordinators | none |
+| Someone signs up and needs approving | Coordinators | none |
 
 For guest bookings these go to the client who booked, and the guest sees the same
 buttons on their page. Each person gets notifications in their own language.
@@ -268,9 +296,8 @@ shouldn't also be the one settling disputes between neighbours.
 **How we got here:** A single "admin" was split into coordinator and maintainer,
 with the separation meant to hold in practice, not just on paper.
 
-**Open questions**
-- Is coordinator approval the right gate, and a coordinator-sent link the right
-  fix for lost phones?
+**Answered:** coordinator approval is the right gate, and a coordinator-sent
+link is the right fix for a lost phone.
 
 ## 11. Built to learn from
 
@@ -285,6 +312,7 @@ fees, credits or limits could be added later without rebuilding the screens.
 - How often do owners reclaim, and how far into a booking?
 - Which spaces get "space occupied" reports?
 - Do guests or clients confirm most arrivals?
+- How often does an offered space actually get used?
 
 ## 12. When things go wrong
 
@@ -292,11 +320,12 @@ fees, credits or limits could be added later without rebuilding the screens.
 |---|---|
 | Two people tap the same space at once | First gets it; second sees the next best |
 | Guest arrives after expiry | Told it expired, shown the client's phone; client rebooks |
-| Owner blocks booked time | Booking cancelled; both sides see phone numbers |
+| Owner blocks booked time, over 30 minutes before it starts | Booking cancelled; both sides see phone numbers |
+| Owner needs the space inside the last 30 minutes, or a car is there | Nothing is cancelled; the app shows both phone numbers |
 | Owner forgot to block, car in the space | Client taps "space occupied" and gets another space |
-| Owner switches to "usually here" | Bookings in the newly closed time are cancelled |
+| Owner switches to "usually here" | Bookings more than 30 minutes away are cancelled; nearer ones stand |
 | Last owner gives up a space | Space closes; its bookings are cancelled |
-| Claim on an already-owned space | Goes to a coordinator; owner keeps control |
+| Two residents say the same space is theirs | A coordinator corrects the assignment |
 | App was off for an hour | Catches up with correct times; stale reminders skipped |
 | Guest link forwarded to a stranger | Still works; the client is accountable and can cancel |
 | Notifications turned off on a phone | App shows a banner to turn them back on |
