@@ -1,9 +1,9 @@
 """The app itself: what starts, what it serves.
 
 This file is deliberately thin. It wires pieces together and owns no rules of
-its own: those live in the modules it imports. Right now it serves two things,
-a health check and a home page, which is enough to prove the skeleton works
-end to end.
+its own: those live in the modules it imports. It starts the database, joins up
+the screens in `app/web/`, and serves the home page, the health check and the
+language switch.
 
 To run it while building:
 
@@ -28,6 +28,8 @@ from app import i18n
 from app.clock import now_utc, to_building_time
 from app.config import settings
 from app.db import connect, migrate
+from app.permissions import PermissionDenied
+from app.web import deps, pages_auth, pages_coordinator, pages_me
 
 HERE = Path(__file__).parent
 templates = Jinja2Templates(directory=HERE / "templates")
@@ -61,6 +63,14 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
 )
+
+# A refused action becomes a plain page rather than a crash, in every screen.
+app.add_exception_handler(PermissionDenied, deps.permission_denied_handler)
+
+# The screens themselves. Each router is a group of related pages.
+app.include_router(pages_auth.router)
+app.include_router(pages_me.router)
+app.include_router(pages_coordinator.router)
 
 # Files served exactly as they are: stylesheet, icons, and later the small
 # JavaScript library the pages use. Kept in the project rather than loaded from
@@ -126,7 +136,7 @@ def _safe_next(referer: str | None, base_url: str) -> str:
 
 
 @app.post("/lang")
-def set_language(request: Request, to: str = Form(...)):
+def set_language(request: Request, _: deps.SameOrigin, to: str = Form(...)):
     """Remember the visitor's language choice and send them back where they were.
 
     The choice is kept in a cookie, which is a small note the browser hands back
@@ -163,16 +173,5 @@ def home(request: Request):
     The language comes from the visitor's own choice or their browser (see
     app/i18n.py), and the whole page flips direction with it.
     """
-    language = i18n.choose_language(
-        cookie_value=request.cookies.get("lang"),
-        accept_language=request.headers.get("accept-language"),
-    )
-    return templates.TemplateResponse(
-        request,
-        "home.html",
-        {
-            "t": i18n.translator(language),
-            "lang": language,
-            "dir": i18n.direction(language),
-        },
-    )
+    viewer = deps.viewer(request)
+    return deps.render(request, viewer, "home.html")

@@ -1,0 +1,95 @@
+{# A resident's own page: their details, their cars, their signed-in devices.
+
+   Three separate forms rather than one big one, so saving a changed phone
+   number doesn't also have to mean re-submitting the car list. #}
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>{{ t("me.title") }}</h1>
+
+  {% if viewer.waiting_for_approval %}
+    {# The one thing a waiting resident needs to know, before anything else. #}
+    <p class="notice">{{ t("me.waiting") }}</p>
+  {% endif %}
+
+  {% if device_code %}
+    {# Shown once, right after it is made: only its fingerprint is stored, so
+       this is the only moment the code exists anywhere readable. #}
+    <div class="card">
+      <h2>{{ t("me.device_code_title") }}</h2>
+      <p class="code-display" dir="ltr">{{ device_code }}</p>
+      <p class="muted">{{ t("me.device_code_hint") }}</p>
+    </div>
+  {% endif %}
+
+  {% if error %}<p class="error">{{ t("me.error") }}</p>{% endif %}
+
+  <form method="post" action="/me" class="stack card">
+    <h2>{{ t("me.details") }}</h2>
+    <label>{{ t("field.name") }}
+      <input name="name" value="{{ viewer.person.name }}" required>
+    </label>
+    <label>{{ t("field.phone") }}
+      <input name="phone" value="{{ viewer.person.phone }}" required inputmode="tel" dir="ltr">
+    </label>
+    <label>{{ t("field.unit") }}
+      <input name="unit" value="{{ viewer.person.unit }}" required>
+    </label>
+    <label>{{ t("field.language") }}
+      <select name="locale">
+        <option value="he" {% if viewer.person.locale == 'he' %}selected{% endif %}>עברית</option>
+        <option value="en" {% if viewer.person.locale == 'en' %}selected{% endif %}>English</option>
+      </select>
+    </label>
+    <button type="submit" class="primary">{{ t("action.save") }}</button>
+  </form>
+
+  <div class="card">
+    <h2>{{ t("me.cars") }}</h2>
+    <p class="muted">{{ t("me.cars_hint") }}</p>
+
+    {% if plates %}
+      <ul class="rows">
+        {% for plate in plates %}
+          <li>
+            {# A plate is digits and letters: kept left-to-right so it reads
+               correctly inside a Hebrew page. #}
+            <bdi dir="ltr">{{ plate["plate"] }}</bdi>
+            <form method="post" action="/me/plates/{{ plate['id'] }}/remove">
+              <button type="submit" class="link">{{ t("action.remove") }}</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <form method="post" action="/me/plates" class="inline">
+      <input name="plate" dir="ltr" autocapitalize="characters" placeholder="12-345-67">
+      <button type="submit">{{ t("me.add_car") }}</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>{{ t("me.devices") }}</h2>
+    <p class="muted">{{ t("me.devices_hint") }}</p>
+
+    <ul class="rows">
+      {% for session in sessions %}
+        <li>
+          <span>{{ session["user_agent"] or t("me.unknown_device") }}</span>
+          <form method="post" action="/me/sessions/{{ session['id'] }}/end">
+            <button type="submit" class="link">{{ t("me.sign_out_device") }}</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <form method="post" action="/me/device-code">
+      <button type="submit">{{ t("me.add_device") }}</button>
+    </form>
+  </div>
+
+  <form method="post" action="/logout" class="spaced">
+    <button type="submit" class="link">{{ t("action.sign_out") }}</button>
+  </form>
+{% endblock %}

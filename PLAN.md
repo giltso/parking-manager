@@ -943,6 +943,7 @@ fragments of a page; the rest return full pages or redirects (POST → 303 redir
 | GET | `/spaces` | res | Public list of spaces, their apartments, owners and assignment history |
 | GET | `/spaces/{id}` | res | Public view; owners/managers get controls |
 | GET | `/spaces/{id}/strip` | res | **Partial:** 7-day timeline |
+| POST | `/me/device-code` | res | Show a one-time code for signing in on another phone |
 | POST | `/spaces/{id}/onboard` | own | `usually=here\|away` → sets the starting rules for a newly assigned space (§8.1) |
 | POST | `/spaces/{id}/release` | own | Give up the space; it returns to the coordinator (§8.5) |
 | POST | `/spaces/{id}/calendar` | mgr | Open or block an exact window picked on the calendar (§8.2) |
@@ -977,8 +978,7 @@ fragments of a page; the rest return full pages or redirects (POST → 303 redir
 | POST | `/coordinator/spaces` | coord | Bulk seed: `1-60, 101-160, B1` |
 | POST | `/coordinator/spaces/{id}/deactivate` | coord | Hide space, withdraw bookings |
 | GET | `/coordinator/people` | coord | Resident list, pending sign-ups first |
-| POST | `/coordinator/people/{id}/approve` | coord | `pending` → `approved` |
-| POST | `/coordinator/people/{id}/reject` | coord | `pending` → `rejected`, sessions ended |
+| POST | `/coordinator/people/{id}/status` | coord | `status=approved\|rejected\|deactivated`; rejecting or deactivating also ends that person's sessions |
 | POST | `/coordinator/spaces/{id}/assign` | coord | Give the space to a resident (creates the owner right) |
 | POST | `/coordinator/spaces/{id}/unassign` | coord | End the current owner right (rules removed, future bookings withdrawn) |
 | POST | `/coordinator/disputes/{right_id}/resolve` | coord | `decision=coowner\|replace\|reject` (replace ends the old owner's right: rules kept, bookings kept) |

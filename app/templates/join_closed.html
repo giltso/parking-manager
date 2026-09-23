@@ -1,0 +1,7 @@
+{# Shown when a sign-up link is old. The building's code can be rotated, so an
+   old link ends up here rather than at an error page. #}
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ t("join.closed_title") }}</h1>
+  <p>{{ t("join.closed_body") }}</p>
+{% endblock %}

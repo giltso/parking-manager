@@ -1,0 +1,71 @@
+{# The coordinator's screen: everyone in the building, waiting ones first.
+
+   One list rather than a separate "pending" page, because a page that is
+   usually empty is a page nobody opens, and then sign-ups sit for days. #}
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>{{ t("coordinator.title") }}</h1>
+
+  <div class="card">
+    <h2>{{ t("coordinator.join_link") }}</h2>
+    <p class="muted">{{ t("coordinator.join_hint") }}</p>
+    <p class="link-display" dir="ltr">{{ join_link }}</p>
+    <form method="post" action="/coordinator/join-code/rotate">
+      <button type="submit">{{ t("coordinator.rotate") }}</button>
+    </form>
+  </div>
+
+  {% if issued_link %}
+    {# Shown once, immediately after it is issued. It cannot be looked up
+       again: the database keeps only its fingerprint. #}
+    <div class="card">
+      <h2>{{ t("coordinator.signin_link") }}</h2>
+      <p class="link-display" dir="ltr">{{ issued_link }}</p>
+      <p class="muted">{{ t("coordinator.signin_hint") }}</p>
+    </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>{{ t("coordinator.people") }}</h2>
+    <ul class="rows">
+      {% for person in people %}
+        <li class="person {{ 'pending' if person['status'] == 'pending' else '' }}">
+          <div>
+            <strong>{{ person["name"] }}</strong>
+            <span class="muted">{{ t("field.unit") }} {{ person["unit"] }}</span>
+            <bdi dir="ltr" class="muted">{{ person["phone"] }}</bdi>
+            <span class="status">{{ t("status." ~ person["status"]) }}</span>
+            {% if person["is_coordinator"] %}<span class="status">{{ t("role.coordinator") }}</span>{% endif %}
+          </div>
+
+          <div class="actions">
+            {% if person["status"] == "pending" %}
+              <form method="post" action="/coordinator/people/{{ person['id'] }}/status">
+                <input type="hidden" name="status" value="approved">
+                <button type="submit" class="primary">{{ t("action.approve") }}</button>
+              </form>
+              <form method="post" action="/coordinator/people/{{ person['id'] }}/status">
+                <input type="hidden" name="status" value="rejected">
+                <button type="submit" class="link">{{ t("action.reject") }}</button>
+              </form>
+            {% elif person["status"] == "approved" %}
+              <form method="post" action="/coordinator/people/{{ person['id'] }}/signin-link">
+                <button type="submit" class="link">{{ t("coordinator.new_link") }}</button>
+              </form>
+              <form method="post" action="/coordinator/people/{{ person['id'] }}/status">
+                <input type="hidden" name="status" value="deactivated">
+                <button type="submit" class="link">{{ t("action.deactivate") }}</button>
+              </form>
+            {% else %}
+              <form method="post" action="/coordinator/people/{{ person['id'] }}/status">
+                <input type="hidden" name="status" value="approved">
+                <button type="submit" class="link">{{ t("action.approve") }}</button>
+              </form>
+            {% endif %}
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endblock %}

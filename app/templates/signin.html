@@ -1,0 +1,11 @@
+{# A coordinator's sign-in link. Opening it only shows this page: the code is
+   spent by the button, so a messaging app's link preview can't burn it. #}
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ t("signin.title") }}</h1>
+  <p class="big">{{ person.name }} <span class="muted">({{ t("field.unit") }} {{ person.unit }})</span></p>
+
+  <form method="post" action="/signin/{{ code }}">
+    <button type="submit" class="primary">{{ t("signin.submit") }}</button>
+  </form>
+{% endblock %}

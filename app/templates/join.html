@@ -1,0 +1,32 @@
+{# Signing up, reached through the building's shared link. Four questions, all
+   short: anything longer and people stop halfway on a phone. #}
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>{{ t("join.title") }}</h1>
+  <p class="muted">{{ t("join.intro") }}</p>
+
+  {% if error %}<p class="error">{{ t("join.error") }}</p>{% endif %}
+
+  <form method="post" action="/join/{{ code }}" class="stack">
+    <label>{{ t("field.name") }}
+      <input name="name" value="{{ values.get('name', '') }}" required autocomplete="name">
+    </label>
+    <label>{{ t("field.phone") }}
+      {# inputmode="tel" gives a phone keypad; dir="ltr" keeps the number
+         readable inside a right-to-left page. #}
+      <input name="phone" value="{{ values.get('phone', '') }}" required
+             inputmode="tel" dir="ltr" autocomplete="tel">
+    </label>
+    <label>{{ t("field.unit") }}
+      <input name="unit" value="{{ values.get('unit', '') }}" required>
+    </label>
+    <label>{{ t("field.language") }}
+      <select name="locale">
+        <option value="he" {% if values.get('locale', lang) == 'he' %}selected{% endif %}>עברית</option>
+        <option value="en" {% if values.get('locale', lang) == 'en' %}selected{% endif %}>English</option>
+      </select>
+    </label>
+    <button type="submit" class="primary">{{ t("join.submit") }}</button>
+  </form>
+{% endblock %}

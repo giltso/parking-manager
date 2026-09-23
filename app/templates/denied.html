@@ -1,0 +1,7 @@
+{# Shown when someone tries something they may not do. It says what was refused
+   and nothing about why, since the reason is only useful to someone probing. #}
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ t("denied.title") }}</h1>
+  <p>{{ t("denied.body") }}</p>
+{% endblock %}

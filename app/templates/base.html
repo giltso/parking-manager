@@ -17,7 +17,20 @@
 </head>
 <body>
   <header class="topbar">
-    <span class="brand">{{ t("app.name") }}</span>
+    <a class="brand" href="/">{{ t("app.name") }}</a>
+
+    {# Only the links this viewer can actually use. Hiding a link is tidiness,
+       not security: the server refuses the action regardless. #}
+    <nav class="nav">
+      {% if viewer is defined and viewer.signed_in %}
+        {% if viewer.actor.is_coordinator %}
+          <a href="/coordinator">{{ t("nav.coordinator") }}</a>
+        {% endif %}
+        <a href="/me">{{ t("nav.me") }}</a>
+      {% else %}
+        <a href="/login">{{ t("nav.sign_in") }}</a>
+      {% endif %}
+    </nav>
     {# Switching language posts to the server, which remembers the choice in a
        cookie. A form rather than a link, because it changes something. #}
     <form method="post" action="/lang" class="lang">

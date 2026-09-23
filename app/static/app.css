@@ -74,3 +74,120 @@ bdi { unicode-bidi: isolate; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* --- forms, cards and lists -------------------------------------------------
+   Added with the sign-in screens. Everything here is sized for a thumb: inputs
+   and buttons are at least 44px tall, which is the smallest target most people
+   hit reliably on a phone. */
+
+.nav { display: flex; gap: 14px; margin-inline-start: auto; }
+.nav a { color: var(--accent); text-decoration: none; }
+.nav a:hover { text-decoration: underline; }
+a.brand { color: inherit; text-decoration: none; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-block-end: 20px;
+}
+
+.card h2 { font-size: 1.1rem; margin-block: 0 10px; }
+
+/* A column of fields with even spacing, rather than margins on each one. */
+.stack { display: flex; flex-direction: column; gap: 14px; }
+
+label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
+
+input, select {
+  font: inherit;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 400;
+}
+
+input:focus-visible, select:focus-visible, button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button {
+  font: inherit;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+/* A button that reads as a link, for the quieter action next to a main one. */
+button.link {
+  border: none;
+  background: none;
+  color: var(--accent);
+  min-height: auto;
+  padding: 4px 0;
+  text-decoration: underline;
+}
+
+.inline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.spaced { margin-block-start: 24px; }
+
+.rows { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 10px; }
+
+.rows li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-block-end: 10px;
+  border-block-end: 1px solid var(--line);
+}
+
+.rows li:last-child { border-block-end: none; padding-block-end: 0; }
+
+.person.pending { background: #fff8e6; margin-inline: -8px; padding: 8px; border-radius: 8px; }
+.person .actions { display: flex; gap: 12px; align-items: center; }
+.status { font-size: 0.85rem; color: var(--ink-soft); }
+
+.error { color: #9b1c1c; background: #fdecec; padding: 10px 12px; border-radius: 8px; }
+.notice { background: #fff8e6; padding: 10px 12px; border-radius: 8px; }
+.big { font-size: 1.3rem; font-weight: 600; }
+
+/* A code is read off one screen and typed into another: spaced out and large,
+   in a font where 8 and B cannot be confused. */
+.code-display {
+  font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 1.8rem;
+  letter-spacing: 0.18em;
+  background: var(--page);
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.code-input {
+  font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 1.3rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Links are long and must not push the page sideways on a phone. */
+.link-display {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  background: var(--page);
+  padding: 10px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
