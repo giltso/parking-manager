@@ -87,6 +87,17 @@ Every package is checked to install and pass tests on 3.14 when the code is
 written; versions aren't guessed here. Test-only tools (pytest, httpx) go in
 `requirements-dev.txt` so they stay out of the production image.
 
+### 2.0 How we work while building
+
+Development runs **locally** (a virtual environment plus `uvicorn --reload`), so
+each edit shows up immediately and the database file is easy to open.
+
+The **Dockerfile is written from step 1 and built at the end of each step**. It
+pins `python:3.14-slim`, and building it regularly proves the app doesn't quietly
+depend on this machine: every setting comes from the environment and the database
+lives at a configurable path. A Dockerfile written later, in a hurry, is a guess
+that fails on the day you need it.
+
 ### 2.1 Project layout
 
 ```
@@ -114,6 +125,8 @@ parking-manager/
       push.py            # outbox + sending
       events.py          # append-only log
       policy.py          # v2 hook: no-op in v1 (§13)
+    permissions.py       # can(actor, action, resource): the only place authorisation is decided (§12.7)
+    i18n.py              # Hebrew/English text, and the page direction that goes with it
     web/                 # routes: read the request, call a service, render a template
       deps.py            # current_person, require_space_role, csrf check
       pages_find.py  pages_bookings.py  pages_guest.py  pages_spaces.py
@@ -202,6 +215,28 @@ is 0→1440.
 ---
 
 ## 4. Data model
+
+### 4.0 Conventions and why they are standard
+
+| Convention | What we do | Why |
+|---|---|---|
+| Primary keys | Every table has `id INTEGER PRIMARY KEY` | Natural keys (a plate, a phone) change; numbers don't. Real identifiers get a `UNIQUE` constraint instead. |
+| Times | ISO-8601 UTC text, `2026-09-23T14:05:00Z` | Fixed-width text sorts and compares correctly in SQL, and stays readable when you open the file. Store UTC, render local (§3). |
+| Booleans | `INTEGER` 0/1 | SQLite has no boolean type. |
+| Foreign keys | Declared, with `PRAGMA foreign_keys = ON` on every connection | SQLite enforces them **only** when that pragma is set; otherwise orphan rows appear silently. |
+| Fixed choices | `CHECK (state IN (…))` | The database refuses impossible values, so a bug in Python can't store one. |
+| Deleting | Nothing is deleted: `deleted_at_utc`, or a status column | The history is what v2's rules will be based on. |
+| Derived numbers | Counted from `event`, never stored | A stored counter drifts from the events it summarises. |
+| Indexes | Match the queries, especially `(space_id, state, start_utc, end_utc)` | Without one, every availability check reads every booking. |
+| Names | `snake_case`, singular tables, `_utc` on instants, `_id` on foreign keys | Consistency makes column names guessable. |
+
+Connection settings: `journal_mode=WAL` (readers don't block the writer),
+`busy_timeout` (a blocked writer waits instead of failing), `foreign_keys=ON`.
+
+Migrations are numbered SQL files, applied in order at startup and recorded in
+`schema_version`. **An applied migration is never edited**: a correction is a new
+file. Editing one leaves every existing database silently different from the new
+one.
 
 The conventions below apply to every table. `id INTEGER PRIMARY KEY`. Times ending in
 `_utc` are UTC text as above. `created_at_utc` exists on every table (left out
@@ -306,7 +341,7 @@ the data v2 needs.
 | host_person_id | FK | Always accountable, including for guest bookings |
 | kind | `self` / `guest` | |
 | guest_label | text | Required when kind=guest (CHECK), e.g. "Mum", "Plumber" |
-| guest_token | text, unique, nullable | Only for guest bookings: 32 random bytes, URL-safe |
+| guest_token_hash | text, unique, nullable | Only for guest bookings. The link carries 32 random URL-safe bytes; the database keeps only their SHA-256 hash. |
 | guest_phone | text, nullable | Entered by the host at booking, or **required** from the guest before "I'm parked" (Suggestion 8) |
 | plate | text, nullable | **Optional** for both kinds, copied at booking time (Suggestion 3) |
 | start_utc, end_utc | text | CHECK `end_utc > start_utc` |
@@ -315,15 +350,16 @@ the data v2 needs.
 | claimed_at_utc | nullable | |
 | closed_at_utc | nullable | When it stopped being held/parked |
 | close_reason | nullable: `ended` / `released` / `cancelled` / `reclaimed` / `withdrawn` / `expired` / `occupied` | More detail than `state`, for analytics |
-| change_count | int | Every edit or extension |
-| start_postponed_count | int | Times the start was moved later (Suggestion 6). Shown to the space's owners and to coordinators. |
+
 
 Index on `(space_id, state, start_utc, end_utc)`. Every availability query uses it.
 
-**Why store the guest token in plain text rather than a hash:** the host may
-need to see the link again ("send me the link again"). A hash can't be turned
-back into the link. The token only unlocks one parking space for a few hours,
-so that convenience is worth more than hashing.
+**Why only a hash of the guest link:** anyone holding the link can act on that
+booking, so the link is a password. A stolen copy of the database must not hand
+someone else's guest link to a stranger. A hash can't be turned back into the
+link, so the host sees the link once, at booking time. If they lose it, **Get a
+new link** issues a fresh one and the old one stops working, which is also the
+right behaviour when a link was shared with the wrong person.
 
 **Why not a database constraint against double-booking?** SQLite has no
 "these time ranges must not overlap" constraint (PostgreSQL does). Instead,
@@ -541,8 +577,11 @@ open and free for the added time. Parking first and tapping "I'm parked" later
 (before expiry) is fine. Moving the start later is allowed by default
 (Suggestion 6); it pushes the expiry back. Every edit is recorded with old and new
 times, and the booking page shows its change history to the space's owners and
-managers and to coordinators. `/coordinator/reports/holds` lists bookings with
-`start_postponed_count >= 2` and held bookings that expired unused, so
+managers and to coordinators. These counts are **derived from the event log**,
+never stored on the booking: a stored counter drifts away from the events it
+claims to summarise, and at this size counting is instant.
+`/coordinator/reports/holds` lists bookings whose start was moved later twice or
+more, and held bookings that expired unused, so
 abuse is visible without automatic limits (Suggestion 6). After the claim, only
 the end can change (extend). The margin rule isn't applied to edits, the same as
 for extensions.
@@ -954,6 +993,36 @@ fragments of a page; the rest return full pages or redirects (POST → 303 redir
 
 ---
 
+## 12.7 Permissions: one module decides everything
+
+`app/permissions.py` answers a single question:
+
+```python
+def can(actor: Actor, action: str, resource=None, *, now: datetime) -> bool
+```
+
+Routes, services and templates ask it. None of them decide for themselves.
+
+Three kinds of permission meet here, which is normal for an app like this:
+
+| Kind | Industry name | Ours |
+|---|---|---|
+| A flag on the person | RBAC (role-based) | `is_coordinator` |
+| A relationship to one thing | ReBAC (relationship-based) | owner or manager **of space 42**; host **of booking 9** |
+| Holding an unguessable link | Capability token | the guest link |
+
+Rules:
+- **Deny by default.** An unknown action returns `False`.
+- **The server always re-checks.** Hiding a button is presentation, not security.
+- **Every check takes `now`**, because rights (a manager's, a guest link's) expire.
+- **Coordinators run the building, not private spaces.** They assign spaces and
+  approve people; they cannot open, block or reclaim someone's space.
+- **The maintainer has no in-app powers** (§11.1).
+- Tested as a matrix: every actor type × action × resource, compared with an
+  expected grid, so a silent authorisation change fails a test.
+
+---
+
 ## 13. Service layer and the v2 hook
 
 Routes never touch SQL or change state themselves. Each action is **one
@@ -1121,7 +1190,9 @@ What happens when things don't go the happy way. "→ asym" means the asymmetry 
 
 Each step ends with tests passing and something you can click.
 
-1. **Skeleton:** `git init`, Dockerfile, pinned requirements, FastAPI app, migrations, `/healthz`, base template (EN/HE, LTR/RTL), HTMX vendored.
+1. **Skeleton:** pinned requirements, Dockerfile, config, clock, database
+   connection and migration runner, the full initial schema (§4), `permissions.py`
+   with its matrix test, i18n and the base template, `/healthz`. No features yet.
 2. **Time + availability core:** `timeutil`, `compute_timeline`, narrowness key. Heavy unit tests, including DST.
 3. **People & sign-in:** join link, coordinator approval, device codes, sessions, maintainer CLI (logged), `/me`, language choice.
 4. **Spaces & owners:** coordinator seeding and assignment, public space list, onboarding question, space screen with presets and calendar, rights.

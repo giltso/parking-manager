@@ -1,0 +1,76 @@
+/* The whole stylesheet. Kept small on purpose: this app is a handful of screens
+   used on a phone, in a hurry, often in a dark car park.
+
+   The one rule that matters everywhere: never write "left" or "right" when you
+   mean "the side the text starts on". Hebrew mirrors the page, so this file
+   uses the logical names (inline-start, inline-end, margin-inline) which follow
+   the direction automatically. */
+
+:root {
+  /* Colours in one place, so a change is one edit. */
+  --ink: #16202b;
+  --ink-soft: #5a6674;
+  --page: #f6f7f9;
+  --card: #ffffff;
+  --line: #d8dee6;
+  --accent: #1f4ba5;
+
+  /* A phone held at arm's length: bigger than a desktop default. */
+  --text: 17px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  font-size: var(--text);
+  line-height: 1.55;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--card);
+  border-block-end: 1px solid var(--line);   /* "block-end" = below, whichever direction */
+}
+
+.brand { font-weight: 700; }
+
+.lang button {
+  font: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.lang button:hover { border-color: var(--accent); }
+
+main {
+  max-width: 34rem;      /* long lines are hard to read; this is about 65 characters */
+  margin-inline: auto;   /* centred, in either direction */
+  padding: 24px 16px 64px;
+}
+
+h1 { font-size: 1.6rem; margin-block: 0 8px; }
+
+.tagline { color: var(--ink-soft); margin-block: 0 24px; }
+
+.muted { color: var(--ink-soft); }
+
+/* Phone numbers and licence plates keep their own direction inside Hebrew
+   text, otherwise "050-1234567" appears reversed. The HTML uses <bdi>. */
+bdi { unicode-bidi: isolate; }
+
+/* Anyone who asked their phone to reduce motion gets no animation from us. */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

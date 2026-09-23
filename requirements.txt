@@ -1,0 +1,14 @@
+# Runtime dependencies, pinned to the exact versions installed and tested on
+# Python 3.14.7. Pinning means a rebuild next year installs what we tested,
+# not whatever happens to be newest that day.
+#
+# To upgrade: change a version here, run the tests, and commit both together.
+
+fastapi==0.141.1            # the web framework: routing, forms, dependencies
+starlette==1.7.0            # what FastAPI is built on (pinned so it can't drift)
+pydantic==2.13.5            # validates and converts incoming data
+uvicorn[standard]==0.53.0   # the server that actually listens for requests
+jinja2==3.1.6               # fills HTML templates with values
+python-multipart==0.0.32    # lets FastAPI read submitted HTML forms
+tzdata==2026.4              # the time-zone database: Windows has none, and the
+                            # slim container image doesn't ship one either

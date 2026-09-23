@@ -1,0 +1,12 @@
+{# The home page. Placeholder content: it exists to prove the shell, the
+   language choice and the stylesheet all work together. Real screens arrive
+   with the features they belong to. #}
+{% extends "base.html" %}
+
+{% block content %}
+  <h1>{{ t("app.name") }}</h1>
+  <p class="tagline">{{ t("app.tagline") }}</p>
+
+  <p>{{ t("home.building") }}</p>
+  <p class="muted">{{ t("home.next") }}</p>
+{% endblock %}

@@ -1,0 +1,33 @@
+{# The shell every page sits inside: one place for the language, the direction
+   and the stylesheet.
+
+   A page that "extends" this file fills in the blocks below instead of
+   repeating the whole document. Jinja comments like this one never reach the
+   browser. #}
+<!doctype html>
+{# lang tells the browser (and a screen reader) which language this is;
+   dir flips the whole layout for Hebrew. #}
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+  <meta charset="utf-8">
+  {# Without this line a phone pretends to be a desktop and shrinks everything. #}
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ t("app.name") }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">{{ t("app.name") }}</span>
+    {# Switching language posts to the server, which remembers the choice in a
+       cookie. A form rather than a link, because it changes something. #}
+    <form method="post" action="/lang" class="lang">
+      <input type="hidden" name="to" value="{{ 'en' if lang == 'he' else 'he' }}">
+      <button type="submit">{{ t("lang.switch") }}</button>
+    </form>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

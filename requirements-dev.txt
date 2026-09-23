@@ -1,0 +1,7 @@
+# Tools used while building and testing. They are deliberately NOT in
+# requirements.txt, so the deployed container stays small and has no test code.
+
+-r requirements.txt
+
+pytest==9.1.1               # runs the tests
+httpx==0.28.1               # lets tests call the app without a real server

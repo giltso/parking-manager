@@ -1,0 +1,14 @@
+# The repository is public, so anything secret or machine-specific stays out.
+
+.venv/                 # the local Python environment (rebuilt from requirements.txt)
+__pycache__/           # Python's compiled cache
+*.pyc
+.pytest_cache/
+
+*.db                   # the database: real residents' names, phones and plates
+*.db-wal
+*.db-shm
+data/                  # where the database lives when running locally
+
+.env                   # notification keys and other secrets
+*.pem
